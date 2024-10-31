@@ -7,10 +7,6 @@ def poincare_distance(u, v):
     """
     Calculate the Poincaré distance between two points in the hyperbolic space.
     
-    The Poincaré distance is a metric used in hyperbolic geometry, specifically in the 
-    Poincaré disk model. It measures the distance between two points while respecting 
-    the curved nature of hyperbolic space.
-    
     Args:
         u (torch.Tensor): First point in the Poincaré disk
         v (torch.Tensor): Second point in the Poincaré disk
@@ -35,9 +31,6 @@ class PoincareEmbedding(nn.Module):
     """
     Neural network module for learning Poincaré embeddings.
     
-    This module learns embeddings in the Poincaré disk model of hyperbolic space,
-    which is particularly useful for representing hierarchical data structures.
-    
     Args:
         num_embeddings (int): Number of embeddings to create
         embedding_dim (int): Dimension of each embedding vector
@@ -61,9 +54,6 @@ class PoincareEmbedding(nn.Module):
     def loss(self, positive_pairs):
         """
         Calculate the loss for the current embeddings based on positive pairs.
-        
-        The loss is calculated as the average Poincaré distance between pairs of points
-        that should be close to each other in the embedding space.
         
         Args:
             positive_pairs (list): List of tuples containing indices of points that 
