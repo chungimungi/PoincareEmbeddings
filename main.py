@@ -4,19 +4,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 
 def poincare_distance(u, v):
-    """
-    Calculate the Poincaré distance between two points in the hyperbolic space.
-    
-    Args:
-        u (torch.Tensor): First point in the Poincaré disk
-        v (torch.Tensor): Second point in the Poincaré disk
-    
-    Returns:
-        torch.Tensor: The Poincaré distance between points u and v
-    
-    Raises:
-        ValueError: If either point lies outside the unit disk
-    """
+    """Compute Poincaré distance between two points."""
     norm_u = u.norm(p=2)
     norm_v = v.norm(p=2)
 
@@ -28,62 +16,43 @@ def poincare_distance(u, v):
     return distance
 
 class PoincareEmbedding(nn.Module):
-    """
-    Neural network module for learning Poincaré embeddings.
-    
-    Args:
-        num_embeddings (int): Number of embeddings to create
-        embedding_dim (int): Dimension of each embedding vector
-    
-    Attributes:
-        embeddings (nn.Parameter): Learnable embedding vectors
-    """
+    """Neural network module for Poincaré embeddings."""
     def __init__(self, num_embeddings, embedding_dim):
         super(PoincareEmbedding, self).__init__()
         self.embeddings = nn.Parameter(torch.randn(num_embeddings, embedding_dim) * 0.5)
 
     def forward(self):
-        """
-        Forward pass of the model.
-        
-        Returns:
-            torch.Tensor: The current embedding vectors
-        """
+        """Return embeddings."""
         return self.embeddings
 
     def loss(self, positive_pairs):
-        """
-        Calculate the loss for the current embeddings based on positive pairs.
-        
-        Args:
-            positive_pairs (list): List of tuples containing indices of points that 
-                                 should be close to each other
-        
-        Returns:
-            torch.Tensor: Average loss value for the given pairs
-        """
+        """Calculate loss for given positive pairs."""
         loss_value = 0.0
         for (i, j) in positive_pairs:
             loss_value += poincare_distance(self.embeddings[i], self.embeddings[j])
         return loss_value / len(positive_pairs)
 
-def train(model, data_loader, num_epochs=150, lr=0.0001):
-    """
-    Train the Poincaré embedding model.
-    
-    This function handles the training loop, optimization, and visualization of the
-    training progress. It also ensures that embeddings stay within the unit disk
-    after each optimization step.
-    
-    Args:
-        model (PoincareEmbedding): The model to train
-        data_loader (list): List of positive pairs for training
-        num_epochs (int, optional): Number of training epochs. Defaults to 150
-        lr (float, optional): Learning rate for optimization. Defaults to 0.0001
-    
-    Returns:
-        None: The function plots the training loss curve and updates the model in-place
-    """
+    def riemannian_gradient(self, positive_pairs):
+        """Calculate Riemannian gradient for optimization."""
+        grad = torch.zeros_like(self.embeddings)
+        
+        for (i, j) in positive_pairs:
+            u = self.embeddings[i]
+            v = self.embeddings[j]
+            distance = poincare_distance(u, v)
+            if distance == 0:
+                continue
+            
+            term_u = (u - v) / distance
+            term_v = (v - u) / distance
+            
+            grad[i] += term_u
+            grad[j] += term_v
+        
+        return grad / len(positive_pairs)
+
+def train(model, data_loader, num_epochs=200, lr=0.001):
+    """Train the Poincaré embeddings model."""
     optimizer = optim.SGD(model.parameters(), lr=lr)
     losses = []
 
@@ -95,10 +64,12 @@ def train(model, data_loader, num_epochs=150, lr=0.0001):
             if torch.isnan(loss): 
                 print(f"NaN loss encountered at epoch {epoch+1}")
                 return
-            loss.backward()
-            optimizer.step()
+            
+            riemann_grad = model.riemannian_gradient(positive_pairs)
             
             with torch.no_grad():
+                model.embeddings -= lr * riemann_grad
+            
                 norms = model.embeddings.norm(p=2, dim=1)
                 model.embeddings[norms > 1] /= norms[norms > 1].view(-1, 1)
 
@@ -118,18 +89,6 @@ def train(model, data_loader, num_epochs=150, lr=0.0001):
     plt.show()
 
 def plot_embeddings(model):
-    """
-    Visualize the learned Poincaré embeddings.
-    
-    Creates a scatter plot of the embeddings in 2D space, showing their positions
-    within the unit disk (represented by a dashed red circle).
-    
-    Args:
-        model (PoincareEmbedding): The model containing learned embeddings
-    
-    Returns:
-        None: The function creates and displays a plot
-    """
     embeddings = model.forward().detach().numpy()
 
     plt.figure(figsize=(8, 8))
